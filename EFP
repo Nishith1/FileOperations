@@ -1,0 +1,93 @@
+CREATE TABLE file_proc_chunk_log (
+    chunk_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- Unique chunk ID
+    file_id UUID NOT NULL,                                -- Reference to original file
+    chnl_cd VARCHAR(30) NOT NULL,                         -- Channel (e.g., PREFERENCES)
+    input_file_name VARCHAR(255) NOT NULL,                -- Name of input file
+    chunk_sequence INTEGER NOT NULL,                      -- Order in the chunk list
+    payload_record_count INTEGER,                         -- Number of records
+    transformed_payload_path TEXT,                        -- S3 path of transformed chunk
+    transformation_status VARCHAR(20),                    -- SUCCESS / FAILED / PARTIAL
+    transformation_error_reason TEXT,                     -- Optional error detail
+    processed_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,     -- When chunk was processed
+    created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+
+
+
+
+CREATE TABLE notification_template_config (
+    template_id VARCHAR(50) PRIMARY KEY,                         -- Unique template name
+    notif_type VARCHAR(50) NOT NULL,                             -- SUCCESS / FAILURE / ALERT
+    delivery_channel VARCHAR(20) NOT NULL,                       -- EMAIL / SLACK / HTTP
+    template_subject TEXT,                                       -- For email/alert subject
+    template_body TEXT NOT NULL,                                 -- Template body with placeholders
+    enabled BOOLEAN DEFAULT TRUE,
+    created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE notification_event_log (
+    notif_event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),   -- Unique ID
+    file_id UUID NOT NULL,                                       -- Reference to processed file
+    chunk_id UUID,                                               -- Optional: chunk reference
+    delivery_channel VARCHAR(20) NOT NULL,                       -- EMAIL / SLACK / HTTP
+    notif_type VARCHAR(50) NOT NULL,                             -- SUCCESS / FAILURE / ALERT
+    template_id VARCHAR(50) NOT NULL,                            -- Refers to template used
+    recipient TEXT NOT NULL,                                     -- Email ID, webhook URL etc.
+    notif_payload JSONB,                                         -- Rendered payload
+    notif_status VARCHAR(20) NOT NULL,                           -- SENT / FAILED / SKIPPED
+    response_code VARCHAR(10),                                   -- Response from downstream
+    response_message TEXT,                                       -- Optional error/failure info
+    created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+file-preprocess-request
+
+{
+  "fileId": "FILE_20250728_001",
+  "fileName": "customer_data.csv",
+  "fileLocation": "gs://bucket-name/incoming/FILE_20250728_001.csv",
+  "metadataId": "META_98237",
+  "sourceType": "CSV",
+  "splitConfig": {
+    "batchSize": 10000
+  },
+  "mappingConfig": {
+    "columnMappings": [
+      { "source": "cust_id", "target": "customerId" },
+      { "source": "cust_name", "target": "name" },
+      { "source": "dob", "target": "dateOfBirth" }
+    ],
+    "transformRules": [
+      { "target": "dateOfBirth", "format": "dd-MM-yyyy", "type": "date" }
+    ]
+  },
+  "requestedBy": "orchestrator-service",
+  "timestamp": "2025-07-28T13:20:00Z"
+}
+
+
+
+file-payload-chunks
+
+{
+  "fileId": "FILE_20250728_001",
+  "chunkId": "CHUNK_001",
+  "chunkNumber": 1,
+  "totalChunks": 10,
+  "payloadLocation": "gs://fuu-processed/FILE_20250728_001/chunk_001.json",
+  "recordCount": 10000,
+  "schemaVersion": "v1.0",
+  "mappingVersion": "meta_98237",
+  "sourceType": "CSV",
+  "timestamp": "2025-07-28T14:00:00Z",
+  "publishedBy": "spark-preprocessor"
+}
